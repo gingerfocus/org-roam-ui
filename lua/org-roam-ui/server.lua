@@ -1,134 +1,161 @@
-local M = {}
+---@class Server
+---@field process Job|nil Server command
+---@field websock Job|nil Websocket to communicate with command
+---@field port_http integer 
+---@field port_ws integer 
+local M = {
+    process = nil,
+    websock = nil,
+    port_http = 35901,
+    port_ws = 35903,
+}
 
 local Job = require("plenary.job")
 
-local function get_script_path()
-  local candidates = {
-    os.getenv("PWD") .. "/rplugin/node/index.js",
-    vim.fn.getcwd() .. "/rplugin/node/index.js",
-  }
-
-  for _, path in ipairs(candidates) do
-    if vim.fn.filereadable(path) == 1 then
-      return path
+-- helper function to find executable
+local function find(name)
+    local path = vim.fn.exepath(name)
+    if #path > 0 then
+        return path
     end
-  end
-
-  return candidates[1]
+    return name
 end
 
-M.server = nil
-M.http_port = 35901
-M.ws_port = 35903
-M.node_process = nil
+function M.start()
+    if M.running() then
+        vim.notify("[orui] server is already running", vim.log.levels.WARN)
+        return
+    end
 
-function M.get_homedir()
-  if vim.fn.has("unix") == 1 then
-    return vim.fn.expand("~")
-  end
-  return vim.env.USERPROFILE or vim.fn.expand("~")
-end
+    -- vim.fn.jobstart({ "fuser", "-k", M.port_http .. "/tcp" })
+    -- vim.fn.jobstart({ "fuser", "-k", M.port_ws .. "/tcp" })
 
-function M.start(config)
-  if M.node_process and M.node_process.is_running then
-    vim.notify("org-roam-ui server is already running", vim.log.levels.WARN)
-    return
-  end
+    vim.defer_fn(function()
+        M.process = Job:new({
+            command = find("npx"),
+            args = { "next", "dev", "-p", tostring(M.port_http) },
+            cwd = "/home/focus/dev/org-roam-ui", -- TODO: dont hardcode this
+            env = {
+                "PATH=" .. vim.env.PATH,
+                "ORUI_PORT_HTTP=" .. M.port_http,
+                "ORUI_PORT_WS=" .. M.port_ws,
+            },
+            on_stdout = function(_, data)
+                -- IGNORE IT
 
-  local script_path = get_script_path()
+                -- if not data then return end
+                -- local output = type(data) == "table" and table.concat(data, "") or tostring(data)
+                -- if #output == 0 then return end
+                -- vim.schedule(function()
+                --     vim.notify("[orui] " .. output .. "\n", vim.log.levels.INFO)
+                -- end)
+            end,
+            on_stderr = function(_, data)
+                if not data then
+                    return
+                end
+                local output = type(data) == "table" and table.concat(data, "") or tostring(data)
+                if #output == 0 then
+                    return
+                end
 
-  if vim.fn.filereadable(script_path) == 0 then
-    vim.notify("org-roam-ui server script not found: " .. script_path, vim.log.levels.ERROR)
-    return
-  end
+                vim.schedule(function()
+                    vim.notify("[orui] " .. output .. "\n", vim.log.levels.ERROR)
+                end)
+            end,
+            on_exit = function(_, exit_code)
+                vim.schedule(function()
+                    local code = exit_code or "unknown"
+                    vim.api.nvim_out_write("[orui] Server exited with code " .. code .. "\n")
+                    M.process = nil
+                end)
+            end,
+        })
 
-  local env = {
-    "ORUI_HTTP_PORT=" .. M.http_port,
-    "ORUI_WS_PORT=" .. M.ws_port,
-  }
+        vim.notify("[orui]: server starting ...", vim.log.levels.INFO)
+        M.process:start()
 
-  local function kill_existing_server()
-    vim.fn.jobstart({ "fuser", "-k", M.http_port .. "/tcp" })
-    vim.fn.jobstart({ "fuser", "-k", M.ws_port .. "/tcp" })
-  end
+        -- --unbuffered is crucial for real-time interaction
+        M.websock = Job:new({
+            command = find("websocat"),
+            args = { "--unbuffered", "ws://localhost:35903" },
+            on_stdout = function(_, data)
+                -- TODO: json parse and act on this
 
-  kill_existing_server()
-  vim.defer_fn(function()
-    M.node_process = Job:new({
-      command = "node",
-      args = { script_path },
-      env = env,
-      on_stdout = function(_, data)
-        local output = type(data) == "table" and table.concat(data, "") or tostring(data)
-        if output and output ~= "" then
-          vim.schedule(function()
-            vim.api.nvim_out_write("[org-roam-ui] " .. output .. "\n")
-          end)
-        end
-      end,
-      on_stderr = function(_, data)
-        local output = type(data) == "table" and table.concat(data, "") or tostring(data)
-        if output and output ~= "" then
-          vim.schedule(function()
-            vim.api.nvim_err_writeln("[org-roam-ui] " .. output)
-          end)
-        end
-      end,
-      on_exit = function(_, exit_code)
-        vim.schedule(function()
-          local code = exit_code or "unknown"
-          vim.api.nvim_out_write("[org-roam-ui] Server exited with code " .. code .. "\n")
-          M.node_process = nil
-        end)
-      end,
-    })
-
-    M.node_process:start()
-    vim.notify("org-roam-ui server starting...", vim.log.levels.INFO)
-  end, 500)
+                -- for _, line in ipairs(data) do
+                --     if line ~= "" then
+                --         vim.schedule(function()
+                --             print("WS Received: " .. line)
+                --         end)
+                --     end
+                -- end
+            end,
+            on_exit = function()
+                M.websock = nil
+            end,
+        })
+        vim.notify("[orui]: Websocat bridge started", vim.log.levels.INFO)
+    end, 500)
 end
 
 function M.stop()
-  if M.node_process then
-    M.node_process:shutdown()
-    M.node_process = nil
-    vim.notify("org-roam-ui server stopped", vim.log.levels.INFO)
-  else
-    vim.notify("org-roam-ui server is not running", vim.log.levels.WARN)
-  end
+    if M.websock then
+        M.websock:shutdown()
+        M.websock = nil
+    end
+
+    if M.process then
+        -- TODO: this just does work
+        M.process:shutdown()
+        M.process = nil
+
+        vim.notify("[orui] server stopped", vim.log.levels.INFO)
+    else
+        vim.notify("[orui] server is not running", vim.log.levels.WARN)
+    end
+
 end
 
-function M.send_graph_data(data)
-  local url = string.format("http://localhost:%d/graphdata", M.http_port)
-  local tmpfile = vim.fn.tempname()
-  local json_str = vim.fn.json_encode(data)
-  vim.fn.writefile({json_str}, tmpfile)
+function M.send(data)
 
-  vim.fn.jobstart({
-    "curl",
-    "-s",
-    "-X", "POST",
-    "-H", "Content-Type: application/json",
-    "--data-binary", "@" .. tmpfile,
-    url,
-  }, {
-    on_stdout = function(_, data)
-    end,
-    on_stderr = function(_, data)
-      if data and #data > 0 then
-        vim.schedule(function()
-          vim.api.nvim_err_writeln("[org-roam-ui] curl error: " .. table.concat(data, ""))
-        end)
-      end
-    end,
-    on_exit = function()
-      vim.fn.delete(tmpfile)
-    end,
-  })
+    local msg = vim.json.encode(data)
+    -- websocat sends a frame for every line it receives on stdin
+    M.websock:send(msg .. "\n")
 end
 
-function M.is_running()
-  return M.node_process ~= nil and M.node_process.is_running
+function M.running()
+    return M.process ~= nil and M.process.is_running
 end
 
 return M
+
+--[[
+local url = string.format("ws://localhost:%d", orui.port_ws)
+local tmpfile = vim.fn.tempname()
+local payload = vim.fn.json_encode({
+    type = "graphdata",
+    data = data,
+})
+vim.fn.writefile({ payload }, tmpfile)
+
+vim.fn.jobstart({ "websocat", url, "--json", tmpfile }, {
+    -- cwd = ""
+    on_stdout = function(_, data) end,
+    on_stderr = function(_, data)
+        if not data then
+            return
+        end
+        local output = type(data) == "table" and table.concat(data, "") or tostring(data)
+        if #output == 0 then
+            return
+        end
+
+        vim.schedule(function()
+            vim.notify("[orui] websocat error: " .. output, vim.log.level.ERROR)
+        end)
+    end,
+    on_exit = function()
+        vim.fn.delete(tmpfile)
+    end,
+})
+--]]

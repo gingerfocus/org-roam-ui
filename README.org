@@ -1,30 +1,30 @@
 * Org Roam Ui
   Based on and builds on the code from [[https://github.com/org-roam/org-roam-ui][here]].
 
-** Note
-   This is a fork of org-roam-ui, thanks to the great work of the org-roam-ui author,
-   what I only need to do, is feed the data to the frontend webpage. which means, I only
-   need to develop a plugin for neovim istead of emacs, like the org-roam-ui.el file do.
-
 ** Installation
-   1. Install the package neovim plugin.
-      "gingerfocus/org-roam-ui"
-   2. globally install neovim npm package.
-      npm install
-   3. start up the frontend page.
-      npm run dev
-   4. In your editor run
-      =:OrgRoamUiOpen=
+    Requires you to have =node= and =websocat= install.
+
+    Assumuing you are using lazy:
+    #+begin_src lua
+    {
+        "gingerfocus/org-roam-ui",
+        build = "npm install",
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+            -- assuming this is configured elsewhere
+            "chipsenkbeil/org-roam.nvim",
+        },
+        opts = {},
+    }
+    #+end_src
+
+    Then in your editor run =:OrgRoamUiOpen=.
+
 ** Upadating
    The main branch is semi-abandoned but still works. I will pull updates if
    they occur but plan to diverge in the future.
 
 ** TODO Features
-   + [X] org-roam-ui ws support and when connected the graph view will be inited.
-   + [X] Http server to view file content
-   + [ ] doc, like recommand plugin keymapping to init ws
-   + [X] move org-roam-ui-server nodejs neovim plugin to org-roam-ui repo
-   + [X] file change watch and update org-roam-ui
-   + [ ] how to open org-roam-ui effectively, write a vim command, write a command to start up this page and call =:InitWs=
-   + [ ] Make an editor indepenent backend implementation (cli)
+   + [ ] View basic relations between nodes.
+   + [ ] Editor indepenent backend (cli).
 
