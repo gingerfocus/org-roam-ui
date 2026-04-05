@@ -8,12 +8,13 @@ export type OrgRoamNode = {
   id: string
   file: string
   title: string
+  // heading level
   level: number
+  // line number
   pos: number
+  // outline path
   olp: string[] | null
-  properties: {
-    [key: string]: string | number
-  }
+  properties: { [key: string]: string | number }
   tags: string[]
 }
 

@@ -1,0 +1,76 @@
+{
+  "nodes": [
+    {
+      "id": "20240315T103000",
+      "file": "~/org/brain/compilers.org",
+      "title": "Compiler Design",
+      "level": 0,
+      "pos": 1,
+      "olp": null,
+      "properties": {
+        "created": "20240315",
+        "category": "computer-science"
+      },
+      "tags": ["cs", "systems", "development"]
+    },
+    {
+      "id": "20240315T104500",
+      "file": "~/org/brain/compilers.org",
+      "title": "LLVM Backend Optimization",
+      "level": 1,
+      "pos": 450,
+      "olp": ["Compiler Design"],
+      "properties": {
+        "priority": "high"
+      },
+      "tags": ["llvm", "optimization"]
+    },
+    {
+      "id": "20240401T090000",
+      "file": "~/org/brain/rust_notes.org",
+      "title": "Rust Language Reference",
+      "level": 0,
+      "pos": 1,
+      "olp": null,
+      "properties": {
+        "version": "1.76"
+      },
+      "tags": ["rust", "reference"]
+    },
+    {
+      "id": "20240402T142000",
+      "file": "~/org/brain/neovim_config.org",
+      "title": "Treesitter Parsers",
+      "level": 2,
+      "pos": 1205,
+      "olp": ["Neovim", "Configuration"],
+      "properties": {
+        "language": "lua"
+      },
+      "tags": ["neovim", "lua"]
+    }
+  ],
+  "links": [
+    {
+      "source": "20240315T104500",
+      "target": "20240401T090000",
+      "type": "id"
+    },
+    {
+      "source": "20240402T142000",
+      "target": "20240315T103000",
+      "type": "fuzzy"
+    }
+  ],
+  "tags": [
+    "cs",
+    "systems",
+    "development",
+    "llvm",
+    "optimization",
+    "rust",
+    "reference",
+    "neovim",
+    "lua"
+  ]
+}

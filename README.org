@@ -1,30 +1,30 @@
 * Org Roam Ui
-  Based on and builds on the code from [[https://github.com/org-roam/org-roam-ui][here]].
+Based on and builds on the code from [[https://github.com/org-roam/org-roam-ui][here]].
 
 ** Installation
-    Requires you to have =node= and =websocat= install.
+Requires you to have =node= and =websocat= install.
 
-    Assumuing you are using lazy:
-    #+begin_src lua
-    {
-        "gingerfocus/org-roam-ui",
-        build = "npm install",
-        dependencies = {
-            "nvim-lua/plenary.nvim",
-            -- assuming this is configured elsewhere
-            "chipsenkbeil/org-roam.nvim",
-        },
-        opts = {},
-    }
-    #+end_src
+Assuming you are using nvim 0.12:
+#+begin_src lua
+vim.pack.add({
+    "https://github.com/nvim-lua/plenary.nvim",
+    { src = "https://github.com/nvim-orgmode/orgmode",       version = "0.7.0" },
+    { src = "https://github.com/chipsenkbeil/org-roam.nvim", version = "0.2.0" },
+    { src = "https://github.com/gingerfocus/org-roam-ui",    version = "0.1.0" },
+})
+require("orgmode").setup {}
+require("org-roam").setup {}
+require("org-roam-ui").setup {}
+-- build = "npm install",
+#+end_src
 
-    Then in your editor run =:OrgRoamUiOpen=.
+Then in your editor run =:OrgRoamUiOpen=.
 
 ** Upadating
-   The main branch is semi-abandoned but still works. I will pull updates if
-   they occur but plan to diverge in the future.
+The main branch is semi-abandoned but still works. I will pull updates if
+they occur but plan to diverge in the future.
 
 ** TODO Features
-   + [ ] View basic relations between nodes.
-   + [ ] Editor indepenent backend (cli).
++ [ ] View basic relations between nodes.
++ [ ] Editor indepenent backend (cli).
 
