@@ -1,7 +1,7 @@
 import { useWindowSize } from '@react-hook/window-size'
 import React, { useEffect, useRef, useState, Suspense, lazy } from 'react'
 import ReconnectingWebSocket from 'reconnecting-websocket'
-import type { OrgRoamGraphReponse, OrgRoamNode, OrgRoamLink } from '../api.d.ts'
+import type { OrgRoamGraphReponse, OrgRoamNode, OrgRoamLink } from './vite-env.d.ts'
 
 import ForceGraph2D from 'react-force-graph-2d'
 // import ForceGraph3D from 'react-force-graph-3d'
@@ -30,12 +30,12 @@ export default function App() {
 
   useEffect(() => { setShowPage(true) }, [])
 
-  const nodeByIdRef = useRef(null)
+  const nodeByIdRef = useRef<NodeById>({})
 
   const updateGraphData = (orgRoamGraphData: OrgRoamGraphReponse) => {
     console.log(orgRoamGraphData)
 
-    const oldNodeById = nodeByIdRef.current
+    const oldNodeById = nodeByIdRef.current ?? []
     const importNodes = orgRoamGraphData.nodes ?? []
     const importLinks = orgRoamGraphData.links ?? []
     const nodesByFile = importNodes.reduce<NodesByFile>((acc, node) => {
@@ -87,7 +87,7 @@ export default function App() {
             }
         ]
       })
-    })
+    }).flat()
 
     nodeByIdRef.current = Object.fromEntries(importNodes.map((node) => [node.id, node]))
 
@@ -145,7 +145,7 @@ export default function App() {
       ...Object.keys(nodeByIdRef.current)
         .filter((id) => !oldNodeById[id])
         .map((id) => {
-          return nodeByIdRef.current[id] as NodeObject
+          return nodeByIdRef.current![id] as OrgRoamNode
         }),
     ]
 
@@ -158,18 +158,17 @@ export default function App() {
     }, {})
 
     const newerLinks = links.map((link) => {
-      const [source, target] = normalizeLinkEnds(link)
       return {
         ...link,
-        source: newNodes[nodeIndex![source]],
-        target: newNodes[nodeIndex![target]],
+        source: newNodes[nodeIndex![link.source]],
+        target: newNodes[nodeIndex![link.target]],
       }
     })
 
     console.log(newNodes)
     console.log(newerLinks)
 
-    setGraphData({ nodes: newNodes as NodeObject[], links: newerLinks })
+    setGraphData({ nodes: newNodes, links: newerLinks })
   }
 
   useEffect(() => {
@@ -178,15 +177,16 @@ export default function App() {
       setGraphData(data)
   }, [])
 
-  const WebSocketRef = useRef(null);
+  const WebSocketRef = useRef<ReconnectingWebSocket | null>(null);
   useEffect(() => {
     // initialize websocket
-    WebSocketRef.current = new ReconnectingWebSocket('ws://localhost:35903')
-    WebSocketRef.current.addEventListener('open', () => {
+    const ws = new ReconnectingWebSocket('ws://localhost:35903')
+    WebSocketRef.current = ws
+    ws.addEventListener('open', () => {
       console.log('Connected')
-      WebSocketRef.current.send("s\n") // send
+      ws.send("s\n") // send
     })
-    WebSocketRef.current.addEventListener('message', (event: any) => {
+    ws.addEventListener('message', (event: any) => {
       console.log(event, 'message')
       const message = JSON.parse(event.data)
       switch (message.type) {
@@ -202,8 +202,8 @@ export default function App() {
   if (!graphData) { return <></> }
 
   return (
-    <div position="absolute">
-      <div overflow="hidden">
+    <div style={{position: "absolute"}}>
+      <div style={{overflow: "hidden"}}>
         <Suspense fallback={null}>
           <ForceGraph2D
             graphData={graphData}

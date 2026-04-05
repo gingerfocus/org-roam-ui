@@ -12,10 +12,11 @@
     "react-dom": "^19.2.4",
     "react-force-graph-2d": "^1.29.1",
     "react-force-graph-3d": "^1.29.1",
-    "reconnecting-websocket": "^4.4.0"
+    "reconnecting-websocket": "^4.4.0",
+    "vite-plugin-singlefile": "^2.3.2"
   },
   "devDependencies": {
-    "@types/d3-interpolate": "^3.0.4",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^5.9.3",

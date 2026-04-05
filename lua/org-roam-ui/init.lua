@@ -1,9 +1,6 @@
 local M = {}
 
-local server = require("org-roam-ui.server")
-
 M.config = {
-    port_http = 35901,
     port_ws = 35903,
     open_on_start = true,
     browser_command = nil,
@@ -17,76 +14,62 @@ local function responder(input)
     M.data(function(data)
         -- vim.notify("[orui] Fetched " .. #data.nodes .. " nodes, " .. #data.links .. " links",
         --     vim.log.levels.INFO)
-        server.send({ data = data, type = "graphdata" })
+        M.send({ data = data, type = "graphdata" })
     end)
 end
 
--- TODO: make a checkhealth function
-function M.check()
-    if vim.fn.executable("websocat") == 0 then
-        vim.notify("[orui]: Missing `websocat` binary. Is it installed?", vim.log.levels.ERROR)
-        return false
-    end
-
-    if vim.fn.executable("npm") == 0 then
-        vim.notify("[orui]: Missing `npm` binary. Is it installed?", vim.log.levels.ERROR)
-        return false
-    end
-
-    local ok, _ = pcall(require, "plenary")
-
-    if not ok then
-        vim.notify("[orui]: Missing `plenary.nvim`. Add 'nvim-lua/plenary.nvim' to config.", vim.log.levels.ERROR)
-        return false
-    end
-
-    return true
-end
-
-function M.setup(config)
-    if not M.check() then
+function M.start()
+    if M.running() then
+        vim.notify("[orui] server is already running", vim.log.levels.WARN)
         return
     end
 
-    M.roam = require("org-roam")
+    -- vim.fn.jobstart({ "fuser", "-k", M.port_ws .. "/tcp" })
 
-    M.config = vim.tbl_deep_extend("force", M.config, config or {})
-    -- server.port_http = M.port_http
-    -- server.port_ws = M.port_ws
+    vim.notify("[orui]: Websocat bridge starting...", vim.log.levels.INFO)
+    M.websock = vim.system(
+        { "websocat", "-s", tostring(M.port_ws) },
+        {
+            stdin = true,
+            stdout = function(_, data)
+                if not data then return end
+                vim.schedule(function() responder(data) end)
+            end,
+            on_exit = function() M.websock = nil end,
+        }
+    )
+end
 
-    vim.keymap.set('n', '<leader>nu', M.open, { desc = "Open org-roam-ui in browser" })
-    vim.keymap.set('n', '<leader>nx', M.stop, { desc = "Stop org-roam-ui server" })
+function M.stop()
+    if M.websock then
+        M.websock:kill()
+        M.websock = nil
+    end
+end
 
-    -- close server
-    vim.api.nvim_create_autocmd("VimLeavePre", { callback = M.stop })
-    -- send new node data
-    vim.api.nvim_create_autocmd("BufWritePost", {
-        pattern = "*.org",
-        callback = M.refresh
-    })
+function M.send(data)
+    local msg = vim.json.encode(data)
+    M.websock:write(msg .. "\n")
+end
+
+function M.running()
+    return M.websock ~= nil
 end
 
 function M.refresh()
-    if not server.running() then return end
+    if not M.running() then return end
 
     -- TODO
 end
 
 function M.open()
     -- this function already checks if it is running, no need
-    server.start(responder)
+    M.start()
 
     -- Open the server
     vim.defer_fn(function()
-        local url = string.format("http://localhost:%d", M.config.port_http)
-        local cmd = M.config.browser_command
-
-        vim.fn.jobstart({ cmd or "xdg-open", url })
+        vim.system({ "xdg-open", "/home/focus/dev/org-mod-ui/dist/index.html" })
     end, 1000)
-end
-
-function M.stop()
-    server.stop()
 end
 
 function M.data(callback)
@@ -132,6 +115,22 @@ function M.data(callback)
             callback(value)
         end, 1000)
     end)
+end
+
+function M.setup(config)
+    M.config = vim.tbl_deep_extend("force", M.config, config or {})
+    M.roam = require("org-roam")
+
+    vim.keymap.set('n', '<leader>nu', M.open, { desc = "Open org-roam-ui in browser" })
+    vim.keymap.set('n', '<leader>nx', M.stop, { desc = "Stop org-roam-ui server" })
+
+    -- close server
+    vim.api.nvim_create_autocmd("VimLeavePre", { callback = M.stop })
+    -- send new node data
+    vim.api.nvim_create_autocmd("BufWritePost", {
+        pattern = "*.org",
+        callback = M.refresh
+    })
 end
 
 return M
